@@ -1,0 +1,50 @@
+# ==============================================================================
+# OpenTelemetry Collector Configuration for Dynatrace APM PurePath Ingestion
+# Routes traces and metrics from Enterprise AI Agent Engine & Spring Boot Services
+# ==============================================================================
+
+receivers:
+  otlp:
+    protocols:
+      grpc:
+        endpoint: 0.0.0.0:4317
+      http:
+        endpoint: 0.0.0.0:4318
+
+processors:
+  batch:
+    send_batch_size: 256
+    timeout: 5s
+  memory_limiter:
+    check_interval: 1s
+    limit_percentage: 75
+    spike_limit_percentage: 20
+  resourcedetection:
+    detectors: [env, system]
+    timeout: 2s
+  transform:
+    error_mode: ignore
+    trace_statements:
+      - context: span
+        statements:
+          - set(attributes["k8s.namespace.name"], "acjoyner-dev")
+          - set(attributes["service.namespace"], "enterprise-ai")
+
+exporters:
+  otlphttp/dynatrace:
+    endpoint: "${DYNATRACE_API_URL:-https://your-env.live.dynatrace.com}/api/v2/otlp"
+    headers:
+      Authorization: "Api-Token ${DYNATRACE_API_TOKEN:-dt0c01.sample-token}"
+  debug:
+    verbosity: detailed
+
+service:
+  pipelines:
+    traces:
+      receivers: [otlp]
+      processors: [memory_limiter, resourcedetection, transform, batch]
+      exporters: [otlphttp/dynatrace, debug]
+    metrics:
+      receivers: [otlp]
+      processors: [memory_limiter, batch]
+      exporters: [otlphttp/dynatrace]

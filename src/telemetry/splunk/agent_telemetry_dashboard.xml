@@ -1,0 +1,98 @@
+<dashboard version="1.1" theme="dark">
+  <label>Enterprise AI Agent Engine - Operations &amp; Observability</label>
+  <description>Real-time telemetry, model latencies, token consumption, and guardrail threat monitoring</description>
+  
+  <row>
+    <panel>
+      <single>
+        <title>Total Invocations (24h)</title>
+        <search>
+          <query>index=enterprise_ai_logs sourcetype=json_agent_telemetry event="llm_call_completed" | stats count</query>
+          <earliest>-24h@h</earliest>
+          <latest>now</latest>
+        </search>
+        <option name="colorMode">block</option>
+        <option name="rangeColors">["0x53a051","0x006d9c"]</option>
+      </single>
+    </panel>
+    <panel>
+      <single>
+        <title>Total Tokens Consumed</title>
+        <search>
+          <query>index=enterprise_ai_logs sourcetype=json_agent_telemetry event="llm_call_completed" | stats sum(total_tokens)</query>
+          <earliest>-24h@h</earliest>
+          <latest>now</latest>
+        </search>
+        <option name="underLabel">Prompt + Completion Tokens</option>
+      </single>
+    </panel>
+    <panel>
+      <single>
+        <title>Total Incurred Cost (USD)</title>
+        <search>
+          <query>index=enterprise_ai_logs sourcetype=json_agent_telemetry event="llm_call_completed" | stats sum(cost_usd) as cost | eval cost="$".tostring(round(cost, 4))</query>
+          <earliest>-24h@h</earliest>
+          <latest>now</latest>
+        </search>
+        <option name="unit">$</option>
+      </single>
+    </panel>
+    <panel>
+      <single>
+        <title>Guardrail Injections Blocked</title>
+        <search>
+          <query>index=enterprise_ai_logs sourcetype=json_agent_telemetry event="prompt_injection_blocked" | stats count</query>
+          <earliest>-24h@h</earliest>
+          <latest>now</latest>
+        </search>
+        <option name="colorMode">block</option>
+        <option name="rangeColors">["0x53a051","0xdc4e41"]</option>
+        <option name="rangeValues">[0]</option>
+      </single>
+    </panel>
+  </row>
+
+  <row>
+    <panel>
+      <chart>
+        <title>Token Consumption by Agent Over Time</title>
+        <search>
+          <query>index=enterprise_ai_logs sourcetype=json_agent_telemetry event="llm_call_completed" | timechart span=15m sum(total_tokens) by agent_name</query>
+          <earliest>-24h@h</earliest>
+          <latest>now</latest>
+        </search>
+        <option name="charting.chart">column</option>
+        <option name="charting.chart.stackMode">stacked</option>
+      </chart>
+    </panel>
+    <panel>
+      <chart>
+        <title>Model Latency Percentiles (ms)</title>
+        <search>
+          <query>index=enterprise_ai_logs sourcetype=json_agent_telemetry event="llm_call_completed" | timechart span=15m median(execution_time_ms) as P50, perc95(execution_time_ms) as P95 by model_name</query>
+          <earliest>-24h@h</earliest>
+          <latest>now</latest>
+        </search>
+        <option name="charting.chart">line</option>
+      </chart>
+    </panel>
+  </row>
+
+  <row>
+    <panel>
+      <table>
+        <title>Recent Request Traces (Correlation Details)</title>
+        <search>
+          <query>index=enterprise_ai_logs sourcetype=json_agent_telemetry event="llm_call_completed"
+| table _time, correlation_id, agent_name, route, model_name, execution_time_ms, total_tokens, cost_usd, status
+| sort - _time
+| head 25</query>
+          <earliest>-24h@h</earliest>
+          <latest>now</latest>
+        </search>
+        <option name="dataOverlayMode">heatmap</option>
+        <option name="rowNumbers">true</option>
+      </table>
+    </panel>
+  </row>
+</dashboard>

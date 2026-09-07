@@ -1,0 +1,66 @@
+# ==============================================================================
+# Enterprise AI Agent Engine - Splunk Operational Search Processing Language (SPL)
+# Ingestion Source: JSON format emitted by src/telemetry/logger.py
+# ==============================================================================
+
+# ------------------------------------------------------------------------------
+# 1. Real-Time Token Throughput & Cost by Agent (Last 24 Hours)
+# ------------------------------------------------------------------------------
+index=enterprise_ai_logs sourcetype=json_agent_telemetry event="llm_call_completed"
+| stats 
+    count as total_invocations,
+    sum(prompt_tokens) as total_prompt_tokens,
+    sum(completion_tokens) as total_completion_tokens,
+    sum(total_tokens) as grand_total_tokens,
+    sum(cost_usd) as total_cost_usd,
+    avg(execution_time_ms) as avg_latency_ms
+    by agent_name
+| eval total_cost_usd=round(total_cost_usd, 4), avg_latency_ms=round(avg_latency_ms, 2)
+| sort - grand_total_tokens
+
+# ------------------------------------------------------------------------------
+# 2. Latency Percentiles (P50, P90, P95, P99) by Model
+# ------------------------------------------------------------------------------
+index=enterprise_ai_logs sourcetype=json_agent_telemetry event="llm_call_completed"
+| stats 
+    count as total_calls,
+    median(execution_time_ms) as p50_latency_ms,
+    perc90(execution_time_ms) as p90_latency_ms,
+    perc95(execution_time_ms) as p95_latency_ms,
+    perc99(execution_time_ms) as p99_latency_ms,
+    max(execution_time_ms) as max_latency_ms
+    by model_name
+| eval p50_latency_ms=round(p50_latency_ms, 1),
+       p90_latency_ms=round(p90_latency_ms, 1),
+       p95_latency_ms=round(p95_latency_ms, 1),
+       p99_latency_ms=round(p99_latency_ms, 1)
+
+# ------------------------------------------------------------------------------
+# 3. Model Fallback and Failure Rate Analysis
+# ------------------------------------------------------------------------------
+index=enterprise_ai_logs sourcetype=json_agent_telemetry event IN ("attempting_model_fallback", "model_invocation_failed", "llm_call_completed")
+| eval is_fallback=if(event=="attempting_model_fallback" OR fallback_occurred==true, 1, 0)
+| eval is_failure=if(event=="model_invocation_failed" OR status=="ERROR", 1, 0)
+| timechart span=5m 
+    sum(is_fallback) as fallback_count,
+    sum(is_failure) as failure_count,
+    count as total_events
+
+# ------------------------------------------------------------------------------
+# 4. Security & Guardrail Interceptions (Prompt Injections & PII Masking)
+# ------------------------------------------------------------------------------
+index=enterprise_ai_logs sourcetype=json_agent_telemetry event IN ("prompt_injection_blocked", "pii_redaction_applied", "output_pii_redacted")
+| stats 
+    count as event_count,
+    values(threat_level) as threat_levels,
+    values(detected_patterns{}) as injection_patterns,
+    values(redacted_types{}) as pii_categories
+    by event, actor
+| sort - event_count
+
+# ------------------------------------------------------------------------------
+# 5. High-Latency & Cost Outlier Alert Search (Trigger: Latency > 5000ms or Cost > $0.05)
+# ------------------------------------------------------------------------------
+index=enterprise_ai_logs sourcetype=json_agent_telemetry event="llm_call_completed" execution_time_ms > 5000 OR cost_usd > 0.05
+| table _time, correlation_id, agent_name, model_name, execution_time_ms, total_tokens, cost_usd, status
+| sort - execution_time_ms
