@@ -7,6 +7,7 @@ import psutil
 from typing import Any, Dict, Optional
 from fastmcp import FastMCP
 from src.telemetry.logger import get_logger
+from src.mcp.resilient_service_tool import invoke_resilient_fulfillment
 
 logger = get_logger("mcp-server")
 
@@ -157,6 +158,20 @@ def record_audit_event(
     logger.info("audit_event_logged", **payload)
     return {"status": "RECORDED", "audit_record": payload}
 
+@mcp.tool()
+async def trigger_resilient_fulfillment(
+    order_id: str, correlation_id: Optional[str] = None
+) -> Dict[str, Any]:
+    """Trigger the ResilientFulfillmentService Spring Boot container via HTTP REST with W3C tracing.
+
+    Args:
+        order_id: Unique order ID to process
+        correlation_id: Tracing correlation ID
+    """
+    logger.info("trigger_resilient_fulfillment_requested", order_id=order_id)
+    return await invoke_resilient_fulfillment(
+        order_id=order_id, correlation_id=correlation_id or "unassigned"
+    )
 
 if __name__ == "__main__":
     mcp.run()

@@ -86,3 +86,5 @@ class DynatraceAgentTracer:
             attrs.update(attributes)
 
         return tracer.start_span(name, attributes=attrs)
+# Alias for module-level import backward compatibility
+inject_w3c_trace_headers = DynatraceAgentTracer.inject_w3c_trace_headers
