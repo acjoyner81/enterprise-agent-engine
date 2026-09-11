@@ -5,7 +5,8 @@ import logging
 import sys
 import uuid
 from contextvars import ContextVar
-from typing import Any, Optional
+from typing import Any
+
 import structlog
 
 # Context variable to hold request correlation ID across async agent tasks
@@ -44,9 +45,7 @@ def add_iso_timestamp(
 ) -> dict[str, Any]:
     """Add ISO-8601 UTC timestamp for high precision Splunk event indexing."""
     if "timestamp" not in event_dict:
-        event_dict["timestamp"] = datetime.datetime.now(
-            datetime.timezone.utc
-        ).isoformat()
+        event_dict["timestamp"] = datetime.datetime.now(datetime.UTC).isoformat()
     return event_dict
 
 
@@ -96,7 +95,7 @@ def log_llm_execution(
     execution_time_ms: float,
     model_name: str,
     status: str = "SUCCESS",
-    cost_usd: Optional[float] = None,
+    cost_usd: float | None = None,
     **extra: Any,
 ) -> None:
     """Log an LLM or Agent execution event with full token, latency, and cost telemetry."""

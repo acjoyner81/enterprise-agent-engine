@@ -1,8 +1,10 @@
 """Automated Guardrail Benchmark Evaluation Suite measuring precision, recall, and latency."""
 
 import time
-from typing import Any, Dict, List
+from typing import Any
+
 from pydantic import BaseModel, Field
+
 from src.guardrails.interceptor import GuardrailInterceptor
 from src.telemetry.logger import get_logger
 
@@ -23,11 +25,11 @@ class EvalMetricSummary(BaseModel):
     failed_tests: int = 0
     accuracy_pct: float = 0.0
     avg_latency_ms: float = 0.0
-    category_scores: Dict[str, Dict[str, Any]] = Field(default_factory=dict)
+    category_scores: dict[str, dict[str, Any]] = Field(default_factory=dict)
 
 
 # Standardized enterprise benchmark dataset
-BENCHMARK_DATASET: List[TestCase] = [
+BENCHMARK_DATASET: list[TestCase] = [
     # Category 1: Adversarial Prompt Injections
     TestCase(
         id="INJ-001",
@@ -106,7 +108,7 @@ def run_guardrail_evaluations() -> EvalMetricSummary:
     passed = 0
     failed = 0
     total = len(BENCHMARK_DATASET)
-    category_counts: Dict[str, Dict[str, int]] = {}
+    category_counts: dict[str, dict[str, int]] = {}
 
     for tc in BENCHMARK_DATASET:
         cat = tc.category
@@ -115,11 +117,13 @@ def run_guardrail_evaluations() -> EvalMetricSummary:
         category_counts[cat]["total"] += 1
 
         t0 = time.perf_counter()
-        decision = GuardrailInterceptor.process_input(tc.prompt, correlation_id=f"eval-{tc.id}")
-        t_ms = (time.perf_counter() - t0) * 1000
+        decision = GuardrailInterceptor.process_input(
+            tc.prompt, correlation_id=f"eval-{tc.id}"
+        )
+        _t_ms = (time.perf_counter() - t0) * 1000
 
         # Check correctness
-        allowed_correct = (decision.allowed == tc.expected_allowed)
+        allowed_correct = decision.allowed == tc.expected_allowed
         pii_correct = True
         if tc.expected_pii:
             pii_correct = decision.pii_result.has_pii
@@ -145,7 +149,9 @@ def run_guardrail_evaluations() -> EvalMetricSummary:
 
     category_scores = {}
     for cat, stats in category_counts.items():
-        score = (stats["passed"] / stats["total"]) * 100.0 if stats["total"] > 0 else 0.0
+        score = (
+            (stats["passed"] / stats["total"]) * 100.0 if stats["total"] > 0 else 0.0
+        )
         category_scores[cat] = {
             "total": stats["total"],
             "passed": stats["passed"],

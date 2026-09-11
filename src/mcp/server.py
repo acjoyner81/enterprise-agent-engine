@@ -3,11 +3,13 @@
 import datetime
 import os
 import platform
+from typing import Any
+
 import psutil
-from typing import Any, Dict, Optional
 from fastmcp import FastMCP
-from src.telemetry.logger import get_logger
+
 from src.mcp.resilient_service_tool import invoke_resilient_fulfillment
+from src.telemetry.logger import get_logger
 
 logger = get_logger("mcp-server")
 
@@ -15,7 +17,7 @@ logger = get_logger("mcp-server")
 mcp = FastMCP("enterprise-telemetry-server")
 
 # Mock Enterprise Graph/Relational Data Store for Vectorless RAG
-ENTERPRISE_DATABASE: Dict[str, Dict[str, Any]] = {
+ENTERPRISE_DATABASE: dict[str, dict[str, Any]] = {
     "ACC-9021": {
         "id": "ACC-9021",
         "entity": "Global Wealth Partners",
@@ -24,7 +26,11 @@ ENTERPRISE_DATABASE: Dict[str, Dict[str, Any]] = {
         "compliance_status": "COMPLIANT",
         "balance_usd": 1450000.00,
         "primary_contact": "alex.morgan@gwp-example.com",
-        "linked_services": ["ResilientFulfillmentService", "KafkaEventStream", "DynatraceAgent"],
+        "linked_services": [
+            "ResilientFulfillmentService",
+            "KafkaEventStream",
+            "DynatraceAgent",
+        ],
         "last_audit": "2026-08-15T10:00:00Z",
     },
     "ACC-4042": {
@@ -42,7 +48,7 @@ ENTERPRISE_DATABASE: Dict[str, Dict[str, Any]] = {
 
 
 @mcp.tool()
-def get_system_health() -> Dict[str, Any]:
+def get_system_health() -> dict[str, Any]:
     """Retrieve host telemetry, memory usage, CPU stats, and active JVM/Java processes.
 
     Useful for diagnostic agents assessing node health, garbage collection impact,
@@ -75,7 +81,7 @@ def get_system_health() -> Dict[str, Any]:
 
     telemetry = {
         "status": "HEALTHY" if mem.percent < 90 else "DEGRADED",
-        "timestamp": datetime.datetime.now(datetime.timezone.utc).isoformat(),
+        "timestamp": datetime.datetime.now(datetime.UTC).isoformat(),
         "platform": platform.platform(),
         "cpu_count": psutil.cpu_count(logical=True),
         "cpu_usage_pct": psutil.cpu_percent(interval=None),
@@ -99,7 +105,7 @@ def get_system_health() -> Dict[str, Any]:
 @mcp.tool()
 def fetch_enterprise_record(
     record_id: str, record_type: str = "account"
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """Retrieve structured enterprise records by ID without vector similarity search.
 
     Implements deterministic Vectorless RAG retrieval from relational/graph records.
@@ -136,8 +142,8 @@ def record_audit_event(
     actor: str,
     details: str,
     severity: str = "INFO",
-    correlation_id: Optional[str] = None,
-) -> Dict[str, Any]:
+    correlation_id: str | None = None,
+) -> dict[str, Any]:
     """Emit an enterprise audit trail event for compliance, Splunk logging, and security review.
 
     Args:
@@ -152,16 +158,17 @@ def record_audit_event(
         "actor": actor,
         "details": details,
         "severity": severity,
-        "timestamp": datetime.datetime.now(datetime.timezone.utc).isoformat(),
+        "timestamp": datetime.datetime.now(datetime.UTC).isoformat(),
         "correlation_id": correlation_id or "unassigned",
     }
     logger.info("audit_event_logged", **payload)
     return {"status": "RECORDED", "audit_record": payload}
 
+
 @mcp.tool()
 async def trigger_resilient_fulfillment(
-    order_id: str, correlation_id: Optional[str] = None
-) -> Dict[str, Any]:
+    order_id: str, correlation_id: str | None = None
+) -> dict[str, Any]:
     """Trigger the ResilientFulfillmentService Spring Boot container via HTTP REST with W3C tracing.
 
     Args:
@@ -172,6 +179,7 @@ async def trigger_resilient_fulfillment(
     return await invoke_resilient_fulfillment(
         order_id=order_id, correlation_id=correlation_id or "unassigned"
     )
+
 
 if __name__ == "__main__":
     mcp.run()

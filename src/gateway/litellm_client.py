@@ -2,9 +2,11 @@
 
 import time
 import uuid
-from typing import Any, Dict, List, Optional
-from pydantic import BaseModel
+from typing import Any
+
 import litellm
+from pydantic import BaseModel
+
 from src.telemetry.logger import get_logger, log_llm_execution
 
 logger = get_logger("litellm-gateway")
@@ -34,7 +36,7 @@ class LiteLLMGateway:
     def __init__(
         self,
         primary_model: str = "ollama/llama3",
-        fallback_models: Optional[List[str]] = None,
+        fallback_models: list[str] | None = None,
         enable_mock_fallback: bool = True,
     ):
         self.primary_model = primary_model
@@ -46,9 +48,9 @@ class LiteLLMGateway:
 
     def generate(
         self,
-        messages: List[Dict[str, str]],
+        messages: list[dict[str, str]],
         agent_name: str = "EnterpriseAgent",
-        correlation_id: Optional[str] = None,
+        correlation_id: str | None = None,
         temperature: float = 0.2,
         max_tokens: int = 1024,
         **kwargs: Any,
@@ -88,19 +90,16 @@ class LiteLLMGateway:
                     getattr(usage, "completion_tokens", 0) if usage else 0
                 )
                 total_tokens = (
-                    getattr(
-                        usage, "total_tokens", prompt_tokens + completion_tokens
-                    )
+                    getattr(usage, "total_tokens", prompt_tokens + completion_tokens)
                     if usage
                     else 0
                 )
 
                 try:
                     cost_usd = (
-                        litellm.completion_cost(completion_response=response)
-                        or 0.0
+                        litellm.completion_cost(completion_response=response) or 0.0
                     )
-                except Exception:
+                except Exception:  # noqa: BLE001
                     cost_usd = 0.0
 
                 content = response.choices[0].message.content or ""
@@ -132,7 +131,7 @@ class LiteLLMGateway:
                     status="SUCCESS",
                 )
 
-            except Exception as exc:
+            except Exception as exc:  # noqa: BLE001  # noqa: BLE001  # noqa: BLE001  # noqa: BLE001
                 last_error = exc
                 logger.warning(
                     "model_invocation_failed",
@@ -145,16 +144,12 @@ class LiteLLMGateway:
         # If all live endpoints failed and mock fallback is enabled
         if self.enable_mock_fallback:
             latency_ms = 45.0
-            last_msg = (
-                messages[-1]["content"] if messages else "No content provided"
-            )
+            last_msg = messages[-1]["content"] if messages else "No content provided"
             mock_content = (
                 f"[OFFLINE MOCK RESPONSE for {agent_name}] Processed request: "
                 f"'{last_msg[:80]}...' (Fallback triggered due to: {last_error})"
             )
-            prompt_tokens = (
-                sum(len(m.get("content", "").split()) for m in messages) * 2
-            )
+            prompt_tokens = sum(len(m.get("content", "").split()) for m in messages) * 2
             completion_tokens = len(mock_content.split()) * 2
 
             log_llm_execution(
@@ -189,9 +184,9 @@ class LiteLLMGateway:
 
     async def agenerate(
         self,
-        messages: List[Dict[str, str]],
+        messages: list[dict[str, str]],
         agent_name: str = "EnterpriseAgent",
-        correlation_id: Optional[str] = None,
+        correlation_id: str | None = None,
         temperature: float = 0.2,
         max_tokens: int = 1024,
         **kwargs: Any,
@@ -218,26 +213,21 @@ class LiteLLMGateway:
                 latency_ms = (time.perf_counter() - start_time) * 1000
 
                 usage = getattr(response, "usage", None)
-                prompt_tokens = (
-                    getattr(usage, "prompt_tokens", 0) if usage else 0
-                )
+                prompt_tokens = getattr(usage, "prompt_tokens", 0) if usage else 0
                 completion_tokens = (
                     getattr(usage, "completion_tokens", 0) if usage else 0
                 )
                 total_tokens = (
-                    getattr(
-                        usage, "total_tokens", prompt_tokens + completion_tokens
-                    )
+                    getattr(usage, "total_tokens", prompt_tokens + completion_tokens)
                     if usage
                     else 0
                 )
 
                 try:
                     cost_usd = (
-                        litellm.completion_cost(completion_response=response)
-                        or 0.0
+                        litellm.completion_cost(completion_response=response) or 0.0
                     )
-                except Exception:
+                except Exception:  # noqa: BLE001
                     cost_usd = 0.0
 
                 content = response.choices[0].message.content or ""
@@ -267,19 +257,17 @@ class LiteLLMGateway:
                     fallback_occurred=fallback_occurred,
                     status="SUCCESS",
                 )
-            except Exception as exc:
+            except Exception as exc:  # noqa: BLE001  # noqa: BLE001  # noqa: BLE001  # noqa: BLE001  # noqa: BLE001
                 last_error = exc
                 continue
 
         if self.enable_mock_fallback:
             latency_ms = 35.0
-            last_msg = (
-                messages[-1]["content"] if messages else "No content provided"
+            last_msg = messages[-1]["content"] if messages else "No content provided"
+            mock_content = (
+                f"[OFFLINE MOCK RESPONSE for {agent_name}] Processed: {last_msg[:80]}"
             )
-            mock_content = f"[OFFLINE MOCK RESPONSE for {agent_name}] Processed: {last_msg[:80]}"
-            prompt_tokens = (
-                sum(len(m.get("content", "").split()) for m in messages) * 2
-            )
+            prompt_tokens = sum(len(m.get("content", "").split()) for m in messages) * 2
             completion_tokens = len(mock_content.split()) * 2
 
             log_llm_execution(

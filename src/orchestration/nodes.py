@@ -1,19 +1,19 @@
 """Node definitions for the LangGraph Multi-Agent State Machine."""
 
 import re
-import time
-from typing import Any, Dict
-from src.orchestration.state import AgentState, StructuredOutputPayload
-from src.guardrails.interceptor import GuardrailInterceptor
-from src.mcp.server import get_system_health, fetch_enterprise_record
+from typing import Any
+
 from src.gateway.litellm_client import LiteLLMGateway
+from src.guardrails.interceptor import GuardrailInterceptor
+from src.mcp.server import fetch_enterprise_record, get_system_health
+from src.orchestration.state import AgentState, StructuredOutputPayload
 from src.telemetry.logger import get_logger, log_llm_execution
 
 logger = get_logger("graph-nodes")
 gateway = LiteLLMGateway(primary_model="ollama/llama3", enable_mock_fallback=True)
 
 
-def guardrail_node(state: AgentState) -> Dict[str, Any]:
+def guardrail_node(state: AgentState) -> dict[str, Any]:
     """Inspect input for prompt injections and mask sensitive PII."""
     prompt = state.get("original_prompt", "")
     corr_id = state.get("correlation_id", "unassigned")
@@ -36,22 +36,41 @@ def guardrail_node(state: AgentState) -> Dict[str, Any]:
     }
 
 
-def router_node(state: AgentState) -> Dict[str, Any]:
+def router_node(state: AgentState) -> dict[str, Any]:
     """Classify user intent to direct execution to specialized worker agents."""
     prompt_lower = state.get("sanitized_prompt", "").lower()
 
-    if any(k in prompt_lower for k in ["health", "cpu", "memory", "jvm", "load", "gc", "system status", "diagnostic"]):
+    if any(
+        k in prompt_lower
+        for k in [
+            "health",
+            "cpu",
+            "memory",
+            "jvm",
+            "load",
+            "gc",
+            "system status",
+            "diagnostic",
+        ]
+    ):
         route = "DIAGNOSTICS"
-    elif re.search(r"\bacc-\d+\b", prompt_lower) or any(k in prompt_lower for k in ["account", "balance", "record", "client entity", "enterprise record"]):
+    elif re.search(r"\bacc-\d+\b", prompt_lower) or any(
+        k in prompt_lower
+        for k in ["account", "balance", "record", "client entity", "enterprise record"]
+    ):
         route = "VECTORLESS_RAG"
     else:
         route = "GENERAL"
 
-    logger.info("intent_routed", correlation_id=state.get("correlation_id"), selected_route=route)
+    logger.info(
+        "intent_routed",
+        correlation_id=state.get("correlation_id"),
+        selected_route=route,
+    )
     return {"route": route}
 
 
-def diagnostic_worker_node(state: AgentState) -> Dict[str, Any]:
+def diagnostic_worker_node(state: AgentState) -> dict[str, Any]:
     """Execute host and JVM diagnostics via FastMCP and generate an analysis report."""
     corr_id = state.get("correlation_id", "unassigned")
     prompt = state.get("sanitized_prompt", "")
@@ -83,11 +102,12 @@ def diagnostic_worker_node(state: AgentState) -> Dict[str, Any]:
         "completion_tokens": state.get("completion_tokens", 0) + resp.completion_tokens,
         "total_tokens": state.get("total_tokens", 0) + resp.total_tokens,
         "total_cost_usd": state.get("total_cost_usd", 0.0) + resp.cost_usd,
-        "execution_latency_ms": state.get("execution_latency_ms", 0.0) + resp.latency_ms,
+        "execution_latency_ms": state.get("execution_latency_ms", 0.0)
+        + resp.latency_ms,
     }
 
 
-def rag_worker_node(state: AgentState) -> Dict[str, Any]:
+def rag_worker_node(state: AgentState) -> dict[str, Any]:
     """Execute deterministic vectorless RAG lookup from structured store and parse output."""
     corr_id = state.get("correlation_id", "unassigned")
     prompt = state.get("sanitized_prompt", "")
@@ -123,11 +143,12 @@ def rag_worker_node(state: AgentState) -> Dict[str, Any]:
         "completion_tokens": state.get("completion_tokens", 0) + resp.completion_tokens,
         "total_tokens": state.get("total_tokens", 0) + resp.total_tokens,
         "total_cost_usd": state.get("total_cost_usd", 0.0) + resp.cost_usd,
-        "execution_latency_ms": state.get("execution_latency_ms", 0.0) + resp.latency_ms,
+        "execution_latency_ms": state.get("execution_latency_ms", 0.0)
+        + resp.latency_ms,
     }
 
 
-def general_worker_node(state: AgentState) -> Dict[str, Any]:
+def general_worker_node(state: AgentState) -> dict[str, Any]:
     """Process general queries through LiteLLM Gateway."""
     corr_id = state.get("correlation_id", "unassigned")
     prompt = state.get("sanitized_prompt", "")
@@ -153,17 +174,20 @@ def general_worker_node(state: AgentState) -> Dict[str, Any]:
         "completion_tokens": state.get("completion_tokens", 0) + resp.completion_tokens,
         "total_tokens": state.get("total_tokens", 0) + resp.total_tokens,
         "total_cost_usd": state.get("total_cost_usd", 0.0) + resp.cost_usd,
-        "execution_latency_ms": state.get("execution_latency_ms", 0.0) + resp.latency_ms,
+        "execution_latency_ms": state.get("execution_latency_ms", 0.0)
+        + resp.latency_ms,
     }
 
 
-def output_formatter_node(state: AgentState) -> Dict[str, Any]:
+def output_formatter_node(state: AgentState) -> dict[str, Any]:
     """Sanitize output, construct structured Pydantic payload, and emit end-to-end metrics."""
     corr_id = state.get("correlation_id", "unassigned")
     raw_content = state.get("response_content", "")
 
     # Post-execution PII protection guardrail
-    sanitized_output = GuardrailInterceptor.process_output(raw_content, correlation_id=corr_id)
+    sanitized_output = GuardrailInterceptor.process_output(
+        raw_content, correlation_id=corr_id
+    )
 
     payload = StructuredOutputPayload(
         correlation_id=corr_id,

@@ -1,19 +1,23 @@
 import pytest
-from src.gateway.litellm_client import LiteLLMGateway, GatewayResponse
+
+from src.gateway.litellm_client import GatewayResponse, LiteLLMGateway
+
 
 def test_gateway_fallback_and_telemetry():
     gateway = LiteLLMGateway(
         primary_model="nonexistent/primary-model",
         fallback_models=["nonexistent/secondary-model"],
-        enable_mock_fallback=True
+        enable_mock_fallback=True,
     )
-    
+
     response = gateway.generate(
-        messages=[{"role": "user", "content": "Check cluster health and memory consumption."}],
+        messages=[
+            {"role": "user", "content": "Check cluster health and memory consumption."}
+        ],
         agent_name="TestDiagnosticAgent",
-        correlation_id="corr-gw-001"
+        correlation_id="corr-gw-001",
     )
-    
+
     assert isinstance(response, GatewayResponse)
     assert response.correlation_id == "corr-gw-001"
     assert response.fallback_occurred is True
@@ -23,20 +27,21 @@ def test_gateway_fallback_and_telemetry():
     assert response.latency_ms > 0
     assert "OFFLINE MOCK RESPONSE" in response.content
 
+
 @pytest.mark.asyncio
 async def test_async_gateway_fallback():
     gateway = LiteLLMGateway(
         primary_model="nonexistent/primary-model",
         fallback_models=["nonexistent/secondary-model"],
-        enable_mock_fallback=True
+        enable_mock_fallback=True,
     )
-    
+
     response = await gateway.agenerate(
         messages=[{"role": "user", "content": "Async audit check."}],
         agent_name="AsyncAgent",
-        correlation_id="corr-async-001"
+        correlation_id="corr-async-001",
     )
-    
+
     assert response.correlation_id == "corr-async-001"
     assert response.fallback_occurred is True
     assert response.total_tokens > 0

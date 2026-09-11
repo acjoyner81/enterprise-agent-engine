@@ -1,12 +1,17 @@
 import json
-import logging
-import sys
-from src.telemetry.logger import configure_telemetry_logger, get_logger, log_llm_execution, current_correlation_id
+
+from src.telemetry.logger import (
+    configure_telemetry_logger,
+    current_correlation_id,
+    get_logger,
+    log_llm_execution,
+)
+
 
 def test_structured_json_logging(capsys):
     configure_telemetry_logger("INFO")
     logger = get_logger("test-agent")
-    
+
     current_correlation_id.set("corr-test-999")
     log_llm_execution(
         logger,
@@ -17,15 +22,17 @@ def test_structured_json_logging(capsys):
         execution_time_ms=120.5,
         model_name="test-model",
         status="SUCCESS",
-        cost_usd=0.0004
+        cost_usd=0.0004,
     )
-    
+
     captured = capsys.readouterr()
     all_output = captured.out + captured.err
-    log_lines = [line for line in all_output.splitlines() if "llm_call_completed" in line]
+    log_lines = [
+        line for line in all_output.splitlines() if "llm_call_completed" in line
+    ]
     assert len(log_lines) >= 1
     log_json = json.loads(log_lines[0])
-    
+
     assert log_json["correlation_id"] == "corr-test-999"
     assert log_json["agent_name"] == "TestAgent"
     assert log_json["prompt_tokens"] == 42

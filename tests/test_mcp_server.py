@@ -1,5 +1,12 @@
 import pytest
-from src.mcp.server import mcp, get_system_health, fetch_enterprise_record, record_audit_event
+
+from src.mcp.server import (
+    fetch_enterprise_record,
+    get_system_health,
+    mcp,
+    record_audit_event,
+)
+
 
 def test_system_health_tool():
     health = get_system_health()
@@ -9,6 +16,7 @@ def test_system_health_tool():
     assert "platform" in health
     assert isinstance(health["jvm_services"], list)
 
+
 def test_fetch_enterprise_record_found():
     record = fetch_enterprise_record("ACC-9021")
     assert record["found"] is True
@@ -16,10 +24,12 @@ def test_fetch_enterprise_record_found():
     assert record["data"]["entity"] == "Global Wealth Partners"
     assert "ResilientFulfillmentService" in record["data"]["linked_services"]
 
+
 def test_fetch_enterprise_record_not_found():
     record = fetch_enterprise_record("NON-EXISTENT-ID")
     assert record["found"] is False
     assert "not found" in record["message"].lower()
+
 
 def test_record_audit_event():
     audit = record_audit_event(
@@ -27,11 +37,12 @@ def test_record_audit_event():
         actor="unit-tester",
         details="Executed automated verification suite",
         severity="INFO",
-        correlation_id="corr-audit-001"
+        correlation_id="corr-audit-001",
     )
     assert audit["status"] == "RECORDED"
     assert audit["audit_record"]["actor"] == "unit-tester"
     assert audit["audit_record"]["correlation_id"] == "corr-audit-001"
+
 
 @pytest.mark.asyncio
 async def test_fastmcp_registered_tools():

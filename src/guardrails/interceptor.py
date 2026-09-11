@@ -1,25 +1,27 @@
 """Guardrail Interceptor combining PII redaction, prompt injection detection, and audit logging."""
 
 import uuid
-from typing import Any, Dict, List, Optional
+
 from pydantic import BaseModel
+
+from src.guardrails.injection_detector import InjectionCheckResult, InjectionDetector
 from src.guardrails.pii_redactor import PIIRedactor, RedactionResult
-from src.guardrails.injection_detector import InjectionDetector, InjectionCheckResult
-from src.telemetry.logger import get_logger
 from src.mcp.server import record_audit_event
+from src.telemetry.logger import get_logger
 
 logger = get_logger("guardrail-interceptor")
 
 
 class InterceptorDecision(BaseModel):
     """Decision object summarizing guardrail inspection results."""
+
     allowed: bool
     sanitized_prompt: str
     original_prompt: str
     pii_result: RedactionResult
     injection_result: InjectionCheckResult
     correlation_id: str
-    block_reason: Optional[str] = None
+    block_reason: str | None = None
 
 
 class GuardrailInterceptor:
@@ -29,7 +31,7 @@ class GuardrailInterceptor:
     def process_input(
         cls,
         prompt: str,
-        correlation_id: Optional[str] = None,
+        correlation_id: str | None = None,
         actor: str = "user",
     ) -> InterceptorDecision:
         """Inspect and sanitize input before it reaches LiteLLM or an Agent node."""
@@ -93,7 +95,7 @@ class GuardrailInterceptor:
     def process_output(
         cls,
         content: str,
-        correlation_id: Optional[str] = None,
+        correlation_id: str | None = None,
         actor: str = "agent",
     ) -> str:
         """Inspect and sanitize agent responses to prevent sensitive data leakage."""

@@ -1,17 +1,19 @@
 """LangGraph State Machine compiling and executing multi-agent workflows."""
 
 import uuid
-from typing import Any, Dict, Optional
-from langgraph.graph import StateGraph, START, END
-from src.orchestration.state import AgentState, StructuredOutputPayload
+from typing import Any
+
+from langgraph.graph import END, START, StateGraph
+
 from src.orchestration.nodes import (
-    guardrail_node,
-    router_node,
     diagnostic_worker_node,
-    rag_worker_node,
     general_worker_node,
+    guardrail_node,
     output_formatter_node,
+    rag_worker_node,
+    router_node,
 )
+from src.orchestration.state import AgentState, StructuredOutputPayload
 from src.tracing.langsmith_tracker import DistributedTracer
 
 tracer = DistributedTracer(project_name="enterprise-langgraph")
@@ -79,7 +81,7 @@ compiled_agent_graph = build_enterprise_graph()
 
 def execute_agent_graph(
     prompt: str,
-    correlation_id: Optional[str] = None,
+    correlation_id: str | None = None,
 ) -> StructuredOutputPayload:
     """Execute the multi-agent state graph end-to-end with distributed tracing."""
     corr_id = correlation_id or f"corr-graph-{uuid.uuid4().hex[:8]}"
@@ -117,4 +119,4 @@ def execute_agent_graph(
         return payload
     except Exception as exc:
         tracer.end_span(span, error=str(exc))
-        raise exc
+        raise

@@ -3,8 +3,10 @@
 import os
 import time
 import uuid
-from typing import Any, Dict, List, Optional
+from typing import Any
+
 from langsmith.run_trees import RunTree
+
 from src.telemetry.logger import get_logger
 
 logger = get_logger("distributed-tracer")
@@ -17,9 +19,9 @@ class LocalSpan:
         self,
         name: str,
         run_type: str,
-        inputs: Dict[str, Any],
+        inputs: dict[str, Any],
         correlation_id: str,
-        parent_id: Optional[str] = None,
+        parent_id: str | None = None,
     ):
         self.id = str(uuid.uuid4())
         self.name = name
@@ -28,11 +30,13 @@ class LocalSpan:
         self.correlation_id = correlation_id
         self.parent_id = parent_id
         self.start_time = time.perf_counter()
-        self.outputs: Dict[str, Any] = {}
-        self.error: Optional[str] = None
+        self.outputs: dict[str, Any] = {}
+        self.error: str | None = None
         self.duration_ms: float = 0.0
 
-    def end(self, outputs: Optional[Dict[str, Any]] = None, error: Optional[str] = None) -> None:
+    def end(
+        self, outputs: dict[str, Any] | None = None, error: str | None = None
+    ) -> None:
         """Mark span as finished and record duration."""
         self.duration_ms = (time.perf_counter() - self.start_time) * 1000
         self.outputs = outputs or {}
@@ -63,14 +67,16 @@ class DistributedTracer:
             os.environ["LANGCHAIN_PROJECT"] = project_name
             logger.info("langsmith_tracing_enabled", project=project_name)
         else:
-            logger.info("local_span_tracing_active", reason="LANGCHAIN_API_KEY not configured")
+            logger.info(
+                "local_span_tracing_active", reason="LANGCHAIN_API_KEY not configured"
+            )
 
     def start_trace(
         self,
         name: str,
         run_type: str = "chain",
-        inputs: Optional[Dict[str, Any]] = None,
-        correlation_id: Optional[str] = None,
+        inputs: dict[str, Any] | None = None,
+        correlation_id: str | None = None,
     ) -> Any:
         """Initialize a root trace for an agent, tool, or chain execution."""
         corr_id = correlation_id or f"corr-trace-{uuid.uuid4().hex[:8]}"
@@ -87,7 +93,7 @@ class DistributedTracer:
                 )
                 run.post()
                 return run
-            except Exception as exc:
+            except Exception as exc:  # noqa: BLE001  # noqa: BLE001
                 logger.warning("langsmith_post_failed", error=str(exc))
 
         # Fallback to local high-precision span
@@ -103,7 +109,7 @@ class DistributedTracer:
         parent_span: Any,
         name: str,
         run_type: str = "tool",
-        inputs: Optional[Dict[str, Any]] = None,
+        inputs: dict[str, Any] | None = None,
     ) -> Any:
         """Create a child span nested under a parent trace node."""
         inp = inputs or {}
@@ -116,7 +122,7 @@ class DistributedTracer:
                 )
                 child.post()
                 return child
-            except Exception as exc:
+            except Exception as exc:  # noqa: BLE001  # noqa: BLE001
                 logger.warning("langsmith_child_post_failed", error=str(exc))
 
         # Fallback to child LocalSpan
@@ -133,8 +139,8 @@ class DistributedTracer:
     def end_span(
         self,
         span: Any,
-        outputs: Optional[Dict[str, Any]] = None,
-        error: Optional[str] = None,
+        outputs: dict[str, Any] | None = None,
+        error: str | None = None,
     ) -> None:
         """End trace span and persist outputs to LangSmith or Splunk logger."""
         out = outputs or {}
@@ -143,7 +149,7 @@ class DistributedTracer:
                 span.end(outputs=out, error=error)
                 span.patch()
                 return
-            except Exception as exc:
+            except Exception as exc:  # noqa: BLE001  # noqa: BLE001
                 logger.warning("langsmith_patch_failed", error=str(exc))
 
         if isinstance(span, LocalSpan):

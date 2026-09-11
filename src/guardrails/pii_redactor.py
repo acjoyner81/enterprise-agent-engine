@@ -1,26 +1,33 @@
 """PII Redaction Engine applying high-accuracy pattern matching to mask sensitive data."""
 
 import re
-from typing import Dict, List, Pattern, Tuple
+from re import Pattern
+from typing import ClassVar
+
 from pydantic import BaseModel, Field
+
 
 class RedactionResult(BaseModel):
     """Result of PII inspection and redaction."""
+
     original_text: str
     sanitized_text: str
     has_pii: bool = False
     redactions_count: int = 0
-    redacted_types: List[str] = Field(default_factory=list)
+    redacted_types: list[str] = Field(default_factory=list)
 
 
 class PIIRedactor:
     """Pre/post-execution guardrail redacting sensitive enterprise and personal data."""
 
-    PATTERNS: List[Tuple[str, Pattern, str]] = [
+    PATTERNS: ClassVar[list[tuple[str, Pattern, str]]] = [
         # API Keys & Secrets (OpenAI, OpenShift tokens, Bearer tokens)
         (
             "SECRET_TOKEN",
-            re.compile(r"(?:sk-[A-Za-z0-9_-]{20,}|sha256~[A-Za-z0-9_-]{20,}|ghp_[A-Za-z0-9]{36}|Bearer\s+[A-Za-z0-9._~+/-]{20,})", re.IGNORECASE),
+            re.compile(
+                r"(?:sk-[A-Za-z0-9_-]{20,}|sha256~[A-Za-z0-9_-]{20,}|ghp_[A-Za-z0-9]{36}|Bearer\s+[A-Za-z0-9._~+/-]{20,})",
+                re.IGNORECASE,
+            ),
             "[REDACTED_SECRET]",
         ),
         # Email addresses
